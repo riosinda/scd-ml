@@ -2,6 +2,7 @@
 .venv-mask/
 .venv-features/
 .env
-data/
+data/HAM10000/
+isic-archive/
 __pycache__/
 *.pth

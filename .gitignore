@@ -6,3 +6,5 @@ data/HAM10000/
 isic-archive/
 __pycache__/
 *.pth
+
+data/

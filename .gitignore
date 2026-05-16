@@ -6,3 +6,7 @@ data/
 __pycache__/
 *.pth
 .DS_Store
+
+# Heavy radiomic feature outputs — sync via GCS, not git.
+results/features/*
+!results/features/.gitkeep

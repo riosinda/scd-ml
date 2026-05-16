@@ -23,6 +23,9 @@ RESULTS_DIR = _env_or_default("SCD_RESULTS_DIR", PROJECT_ROOT / "results")
 HAM10000_DIR = _env_or_default("SCD_HAM10000_DIR", DATA_DIR / "HAM10000")
 ISIC_DIR     = _env_or_default("SCD_ISIC_DIR",     DATA_DIR / "isic-archive")
 
+ISIC_IMAGES_DIR = _env_or_default("SCD_ISIC_IMAGES_DIR", ISIC_DIR / "images")
+ISIC_MASKS_DIR  = _env_or_default("SCD_ISIC_MASKS_DIR",  ISIC_DIR / "masks_selected")
+
 # Generated artifacts live under results/ (data/ is fully gitignored).
 PROCESSED_DIR       = RESULTS_DIR / "processed"
 EDA_ISIC_DIR        = RESULTS_DIR / "eda" / "isic"

@@ -21,10 +21,11 @@ MODELS_DIR  = _env_or_default("SCD_MODELS_DIR",  PROJECT_ROOT / "models")
 RESULTS_DIR = _env_or_default("SCD_RESULTS_DIR", PROJECT_ROOT / "results")
 
 HAM10000_DIR = _env_or_default("SCD_HAM10000_DIR", DATA_DIR / "HAM10000")
-ISIC_DIR     = _env_or_default("SCD_ISIC_DIR",     DATA_DIR / "isic-archive")
 
-ISIC_IMAGES_DIR = _env_or_default("SCD_ISIC_IMAGES_DIR", ISIC_DIR / "images")
-ISIC_MASKS_DIR  = _env_or_default("SCD_ISIC_MASKS_DIR",  ISIC_DIR / "masks_selected")
+# ISIC archive: images + metadata.csv live at the GCS mount root (flat structure)
+ISIC_DIR        = _env_or_default("SCD_ISIC_DIR",        Path("~/data/gcs").expanduser())
+ISIC_IMAGES_DIR = _env_or_default("SCD_ISIC_IMAGES_DIR", ISIC_DIR)
+ISIC_MASKS_DIR  = _env_or_default("SCD_ISIC_MASKS_DIR",  Path("~/data/gcs-masks").expanduser())
 
 # Generated artifacts live under results/ (data/ is fully gitignored).
 PROCESSED_DIR       = RESULTS_DIR / "processed"

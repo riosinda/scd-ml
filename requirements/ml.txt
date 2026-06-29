@@ -1,0 +1,5 @@
+# Python latest — ML/DL model training (final classification stage)
+# Environment: .venv/  (managed with pyenv)
+#
+# Fill this file after activating .venv:
+#   pip freeze > requirements/ml.txt

@@ -1,0 +1,6 @@
+# Python 3.12.6 — Mask R-CNN training and inference
+# Environment: .venv-mask/  (managed with pyenv)
+# GCP: GPU L4, 32 vCPU, 128 GB RAM
+#
+# Fill this file on the GCP instance after activating .venv-mask:
+#   pip freeze > requirements/mask.txt

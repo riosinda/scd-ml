@@ -4,60 +4,100 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Skin cancer classification thesis project focused on lesion segmentation using Mask R-CNN, radiomic feature extraction, and ML techniques. Datasets used: HAM10000, ISIC Archive, and a custom UDEM dataset.
+Skin cancer classification thesis project with a three-stage pipeline:
+1. **Lesion segmentation** — Mask R-CNN trained on HAM10000
+2. **Radiomic feature extraction** — parallel extraction via pyradiomics
+3. **ML/DL classification** — final model trained on extracted features
 
-## Environment Setup
+Datasets: HAM10000 (local), ISIC Archive (GCS), UDEM custom dataset (GCS).
 
-There are multiple virtual environments for different components (all gitignored):
-- `.venv/` — general environment
-- `.venv-mask/` — Mask R-CNN training/inference
-- `.venv-features/` — feature extraction
+## Python Environments
 
-Install dependencies:
+Three separate environments managed with **pyenv**. All are gitignored.
+
+| Environment | Python | Purpose |
+|-------------|--------|---------|
+| `.venv-mask/` | 3.12.6 | Mask R-CNN training and inference |
+| `.venv-features/` | 3.7 | Radiomic feature extraction (pyradiomics) |
+| `.venv/` | latest | Final ML/DL classification model |
+
+Dependencies (fill on the GCP VM after `pip freeze`):
+- `requirements/mask.txt` — for `.venv-mask`
+- `requirements/features.txt` — for `.venv-features`
+- `requirements/ml.txt` — for `.venv`
+
+## EDA Notebooks
+
+EDA notebooks live in `notebooks/eda/`, numbered by dataset in analysis order:
+
 ```bash
-pip install -r requirements.txt
+jupyter notebook notebooks/eda/
 ```
 
-Note: PyTorch and torchvision are used in `src/mask/` but are not listed in `requirements.txt` — install them separately as needed.
+| Notebook | Dataset | Description |
+|----------|---------|-------------|
+| `notebooks/eda/01_isic_archive.ipynb` | ISIC Archive | Class distribution, demographics, image dimensions |
+| `notebooks/eda/02_ham10000.ipynb` | HAM10000 | Class balance, demographics, mask quality |
+| `notebooks/eda/03_udem.ipynb` | UDEM | Custom dataset exploration |
 
-## Running Notebooks
+> Training/inference notebooks are archived in `notebooks/archive/` — their logic was extracted to scripts to avoid kernel crashes on GCP remote sessions.
 
-Notebooks are numbered and meant to be run in order:
-- `notebooks/00_eda_isci_archive.ipynb` — EDA on ISIC archive metadata
-- `notebooks/01_train_mask_rcnn.ipynb` — Train Mask R-CNN for lesion segmentation
-- `notebooks/02_apply_segmentation.ipynb` — Apply trained model to segment lesions
+## Scripts (Training & Inference)
 
-Launch with:
-```bash
-jupyter notebook notebooks/
-```
+Run these in a **tmux session** on GCP to survive SSH disconnections.
+
+| Script | Environment | Description |
+|--------|-------------|-------------|
+| `scripts/01_train_mask_rcnn.py` | `.venv-mask` | Train Mask R-CNN on HAM10000 |
+| `scripts/02_apply_segmentation.py` | `.venv-mask` | Inference on ISIC images → save masks to GCS |
+| `scripts/03_extract_features.py` | `.venv-features` | Parallel radiomic feature extraction (resumable) |
 
 ## Architecture
 
 ### Pipeline
 
-1. **EDA** (`notebooks/00_*`) — explores `data/metadata.csv` (ISIC archive) and `data/udem_skin_cancer.csv`
-2. **Annotation prep** (`src/mask/coco_annotations.py`) — converts binary masks from HAM10000 to COCO JSON format with RLE encoding
-3. **Training** (`notebooks/01_*` + `src/mask/`) — trains Mask R-CNN using torchvision; training loop is in `src/mask/engine.py`
-4. **Evaluation** (`src/mask/mask_evaluation.py`) — computes Dice, IoU, Precision, Recall, Specificity, Accuracy; results saved to `results/`
-5. **Inference** (`notebooks/02_*`) — loads saved `.pth` model from `models/` and runs segmentation
+1. **EDA** (`notebooks/eda/`) — explore metadata and class distributions
+2. **Annotation prep** (`src/mask/coco_annotations.py`) — convert HAM10000 binary masks → COCO JSON (RLE)
+3. **Training** (`scripts/01_train_mask_rcnn.py` + `src/mask/`) — Mask R-CNN via torchvision; loop in `src/mask/engine.py`
+4. **Evaluation** (`src/mask/mask_evaluation.py`) — Dice, IoU, Precision, Recall, Specificity, Accuracy → `results/`
+5. **Inference** (`scripts/02_apply_segmentation.py`) — load `.pth` from `models/` or GCS, run segmentation
+6. **Feature extraction** (`scripts/03_extract_features.py`) — parallel pyradiomics on segmented images → GCS
+7. **Classification** (`.venv/`, TBD) — train final ML/DL model on extracted features
 
 ### `src/mask/` Module
 
 | File | Purpose |
 |------|---------|
-| `coco_annotations.py` | Converts HAM10000 binary masks → COCO JSON annotations |
+| `coco_annotations.py` | Convert HAM10000 binary masks → COCO JSON annotations |
 | `coco_utils.py` | PyTorch `CocoDetection` dataset class + conversion utilities |
 | `coco_eval.py` | `CocoEvaluator` — wraps pycocotools for bbox/segm evaluation |
 | `engine.py` | `train_one_epoch()` and `evaluate()` training loops |
 | `mask_evaluation.py` | Segmentation metrics: Dice, IoU, Precision, Recall, etc. |
-| `transforms.py` | Data augmentation for detection/segmentation (random flip, IoU crop, etc.) |
+| `transforms.py` | Data augmentation for detection/segmentation |
 | `utils.py` | `MetricLogger`, `SmoothedValue`, distributed training helpers |
+
+### `src/` Utilities
+
+| File | Purpose |
+|------|---------|
+| `paths.py` | Portable path resolver — all dirs via `SCD_*` env vars |
+| `viz.py` | Shared plotting utilities (`setup_style()`, `save_fig()`) |
 
 ### Data
 
-- `data/metadata.csv` — ISIC archive metadata (117 MB, tracked in git)
-- `data/udem_skin_cancer.csv` — UDEM dataset metadata
-- `data/HAM10000/` — raw images and masks (gitignored, must be downloaded separately)
-- `models/` — trained `.pth` model files (gitignored)
-- `results/` — CSV files with training history and test metrics
+- `data/HAM10000/` — raw images and binary masks (gitignored, download from Kaggle)
+- `data/HAM10000/metadata.csv` — HAM10000 dataset metadata
+- `models/` — trained `.pth` checkpoints (gitignored, stored in GCS)
+- `results/` — training history CSVs, evaluation metrics, EDA plots
+- ISIC and UDEM images/masks live on GCS mounts (not in repo)
+
+### Path Overrides
+
+All critical paths can be overridden via environment variables (see `src/paths.py`):
+
+```bash
+export SCD_DATA_DIR=/path/to/data
+export SCD_MODELS_DIR=/path/to/models
+export SCD_ISIC_IMAGES_DIR=/mnt/gcs/images
+export SCD_ISIC_MASKS_DIR=/mnt/gcs/masks
+```

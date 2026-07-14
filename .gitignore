@@ -12,3 +12,7 @@ train.log
 # Heavy radiomic feature outputs — sync via GCS, not git.
 results/features/*
 !results/features/.gitkeep
+
+# Cleaned feature matrix (127 MB) — regenerate with
+# notebooks/preprocessing/01_feature_cleaning.ipynb, or sync via GCS.
+results/processed/features_clean.parquet

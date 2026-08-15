@@ -5,7 +5,7 @@ to avoid SSH/kernel session crashes when running on GCP remote instances via tmu
 
 | Notebook | Replaced by |
 |----------|-------------|
-| `02_apply_segmentation.ipynb` | `scripts/apply_segmentation.py` |
-| `03_features_extraction.ipynb` | `scripts/extract_features.py` |
+| `apply_segmentation.ipynb` | `scripts/segment_isic.py` |
+| `features_extraction.ipynb` | `scripts/extract_radiomics.py` |
 
 Run the scripts directly in a tmux session on the GCP instance — see the main README for instructions.

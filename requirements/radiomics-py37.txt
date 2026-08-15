@@ -1,0 +1,14 @@
+# Python 3.7.17 — isolated PyRadiomics extractor only.
+numpy==1.21.6
+pandas==1.3.5
+opencv-python-headless==4.13.0.92
+SimpleITK==2.2.1
+pyradiomics==3.1.0
+PyWavelets==1.3.0
+pykwalify==1.8.0
+ruamel.yaml==0.17.21
+docopt==0.6.2
+six==1.17.0
+python-dateutil==2.9.0.post0
+pytz==2024.2
+tqdm==4.68.0

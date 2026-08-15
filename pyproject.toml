@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scd-ml"
+version = "0.1.0"
+description = "Skin cancer detection research pipeline"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["scd_ml*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+exclude = [
+    "notebooks",
+    "src/mask",
+    "scripts/extract_radiomics.py",
+    "scripts/03_extract_features.py",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

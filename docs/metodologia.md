@@ -4,8 +4,9 @@ Protocolo experimental para el modelo final de clasificación entrenado sobre ca
 radiómicas extraídas de imágenes ISIC (segmentación Mask R-CNN → pyradiomics → ML).
 
 **Dataset:** 76,715 imágenes · 27,343 lesiones · 5,791 pacientes · 4 clases
-**Características:** 408 features radiómicas (4 canales × 7 clases de features), reducidas por
-el filtro de correlación en `notebooks/preprocessing/01_feature_cleaning.ipynb`
+**Características:** features radiómicas (4 canales × 7 clases de features). El pipeline
+activo no aplica un filtro global de correlación; el preprocesamiento se implementará
+dentro de los folds de clasificación.
 
 | Clase | Imágenes | Proporción |
 |-------|----------|------------|
@@ -80,9 +81,9 @@ pipe = Pipeline([
 Al pasar este objeto a `cross_val_score`, sklearn garantiza que cada paso se ajuste solo con
 train.
 
-> **Limitación conocida:** la winsorización (p1–p99) en
-> `notebooks/preprocessing/01_feature_cleaning.ipynb` se ajusta sobre el dataset completo.
-> O la mueves dentro del pipeline, o la declaras como limitación.
+> El notebook de preprocesamiento global es un prototipo archivado. Sus outputs históricos
+> no son entradas válidas para el clasificador. Winsorización y filtrado de correlación deben
+> implementarse como estimadores dentro de cada fold.
 
 ---
 
@@ -187,7 +188,7 @@ orden? ¿Tiene sentido clínico el patrón?
 4. Ensamble vs mejor modelo individual vs baselines de ponderación
 5. **Métrica final sobre el test congelado** — el número honesto
 6. Análisis SHAP + discusión clínica
-7. Limitaciones — winsorización global, SMOTE en alta dimensión, supuesto de no interacción
+7. Limitaciones — SMOTE en alta dimensión y supuesto de no interacción
 
 ---
 

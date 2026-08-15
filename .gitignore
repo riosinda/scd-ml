@@ -1,13 +1,15 @@
 .venv/
-.venv-mask/
 .venv-features/
 .env
-data/
+/data/
 __pycache__/
 *.pth
 .DS_Store
 train.log
 *.log
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
 
 # Heavy radiomic feature outputs — sync via GCS, not git.
 results/features/*

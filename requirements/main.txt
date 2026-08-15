@@ -1,0 +1,14 @@
+# Python 3.12.10 — EDA, data contracts, segmentation and future classification.
+# Torch is installed separately from torch-cpu.txt or torch-cu126.txt.
+numpy==2.2.6
+pandas==2.3.3
+polars==1.34.0
+pyarrow==22.0.0
+scipy==1.16.2
+scikit-learn==1.7.2
+matplotlib==3.10.7
+seaborn==0.13.2
+Pillow==11.3.0
+tqdm==4.67.1
+PyYAML==6.0.3
+pycocotools==2.0.10

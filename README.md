@@ -1,222 +1,200 @@
 # Skin Cancer Detection — ML Thesis
 
-Skin cancer classification pipeline using lesion segmentation (Mask R-CNN), radiomic feature extraction, and ML/DL classification. Datasets: HAM10000, ISIC Archive, UDEM.
+Pipeline de investigación para segmentación de lesiones, extracción de variables
+radiomics y futura clasificación de cáncer de piel.
 
----
+## Alcance actual
 
-## Pipeline
-
-```
-EDA  →  Mask R-CNN training  →  Inference (segmentation)  →  Feature extraction  →  ML/DL model
-(HAM10000 + ISIC + UDEM)       (HAM10000)                    (ISIC on GCS)          (radiomic features)
-```
-
----
-
-## Repository Structure
-
-```
-scd-ml/
-├── notebooks/              # EDA notebooks (Jupyter)
-│   └── archive/            # Deprecated notebooks (logic moved to scripts/)
-├── scripts/                # Training, inference, and feature extraction scripts
-├── src/
-│   ├── paths.py            # Portable path resolver (SCD_* env var overrides)
-│   ├── viz.py              # Shared plotting utilities
-│   └── mask/               # Mask R-CNN source (torchvision-based)
-├── requirements/
-│   ├── mask.txt            # Python 3.12.6 — Mask R-CNN
-│   ├── features.txt        # Python 3.7 — radiomic extraction
-│   └── ml.txt              # Latest Python — final classification model
-├── results/                # Plots, CSVs, model evaluation outputs
-├── models/                 # Trained .pth checkpoints (gitignored, store in GCS)
-└── data/                   # Raw datasets (gitignored, see Datasets section)
+```text
+HAM10000 metadata ──► split 70/10/20 por lesión ──► Mask R-CNN
+                                                        │
+ISIC metadata ─────► split 80/20 por paciente           │
+        │                                               ▼
+        └──────────────────────────────────────► máscaras ISIC
+                                                        │
+                                                        ▼ Python 3.7.17
+                                                PyRadiomics CSV
+                                                        │
+                                                        ▼ Python 3.12.10
+                                                validación de contrato
 ```
 
----
+- HAM10000 se usa exclusivamente para segmentación.
+- ISIC aporta el conjunto de futura clasificación y mantiene un test bloqueado del 20 %.
+- El clasificador aún no forma parte del repositorio.
+- UDEM queda reservado para validación externa futura.
+- Los notebooks son EDA; no definen el pipeline de producción.
 
-## Datasets
+## Entornos de Python
 
-| Dataset | Location | Notes |
-|---------|----------|-------|
-| HAM10000 | `data/HAM10000/` (local) | Download from [Kaggle](https://www.kaggle.com/datasets/kmader/skin-lesion-analysis-toward-melanoma-detection). Includes `images/`, `masks/`, `metadata.csv`. |
-| ISIC Archive | GCS bucket (mount) | Images and metadata — mounted at `~/data/gcs/` via gcsfuse |
-| UDEM | GCS bucket (mount) | Custom dataset — mounted at a separate GCS path |
+Se usan dos entornos creados con `pyenv`, `venv` y `pip`. No se usa `uv`.
 
-Expected local structure for HAM10000:
-```
-data/
-└── HAM10000/
-    ├── images/         # JPEG lesion images
-    ├── masks/          # Binary PNG masks
-    └── metadata.csv    # Ground-truth labels and demographics
-```
+| Entorno | Python | Responsabilidad |
+|---|---:|---|
+| `.venv` | 3.12.10 | EDA, splits, segmentación, validación y futura clasificación |
+| `.venv-features` | 3.7.17 | Solo `scripts/extract_radiomics.py` |
 
----
-
-## Python Environments
-
-Three separate environments managed with **pyenv**. All are gitignored.
-
-| Environment | Python | Purpose |
-|-------------|--------|---------|
-| `.venv-mask/` | 3.12.6 | Mask R-CNN training and inference |
-| `.venv-features/` | 3.7 | Radiomic feature extraction (pyradiomics) |
-| `.venv/` | latest | Final ML/DL classification model |
-
-Set up each environment:
-```bash
-# Install pyenv: https://github.com/pyenv/pyenv
-pyenv install 3.12.6
-pyenv install 3.7.17
-
-# Mask R-CNN environment
-pyenv local 3.12.6
-python -m venv .venv-mask
-source .venv-mask/bin/activate
-pip install -r requirements/mask.txt
-
-# Feature extraction environment (Python 3.7 — order matters)
-pyenv local 3.7.17
-python -m venv .venv-features
-source .venv-features/bin/activate
-pip install numpy pandas opencv-python pydicom
-pip install SimpleITK --only-binary :all:
-pip install pyradiomics
-
-# ML/DL model environment
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements/ml.txt
-```
-
-> **Note:** `requirements/` files are placeholders. Run `pip freeze > requirements/<env>.txt` on the GCP VM after installing dependencies.
-
----
-
-## GCP Setup
-
-### Instance Requirements
-
-| Resource | Minimum | Recommended |
-|----------|---------|-------------|
-| GPU | — | L4 |
-| vCPUs | 16 | 32 |
-| RAM | 128 GB | 128 GB |
-| Boot disk | 100 GB SSD | 200 GB SSD |
-| OS | Debian 11 / Ubuntu 22.04 | — |
-
-Mask R-CNN training requires at least 128 GB of RAM due to the size of HAM10000 loaded in memory.
-
-### GCS Storage Layout
-
-All large assets (images, masks, models, feature CSVs) live in a GCS bucket to avoid local storage limits and enable sharing between machines.
-
-```
-gs://your-bucket/scd-ml/
-├── images/           # ISIC archive images (flat, ~470 K JPEGs)
-├── masks/            # Segmentation masks output by apply_segmentation.py
-├── models/           # Trained .pth checkpoints
-└── features/         # Extracted radiomic feature CSVs (500 MB+)
-```
-
-### Mount ISIC Images with gcsfuse
+`.python-version` fija Python 3.12.10 como intérprete predeterminado. Para crear
+ambos entornos sin cambiar repetidamente `pyenv local`:
 
 ```bash
-# Install gcsfuse
-export GCSFUSE_REPO=gcsfuse-$(lsb_release -cs)
-echo "deb https://packages.cloud.google.com/apt $GCSFUSE_REPO main" | sudo tee /etc/apt/sources.list.d/gcsfuse.list
-curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
-sudo apt-get update && sudo apt-get install -y gcsfuse
+pyenv install -s 3.12.10
+pyenv install -s 3.7.17
+pyenv local 3.12.10
 
-# Authenticate
-gcloud auth application-default login
-
-# Mount buckets
-mkdir -p ~/data/gcs ~/data/gcs-masks
-gcsfuse --implicit-dirs your-bucket/images ~/data/gcs
-gcsfuse --implicit-dirs your-bucket/masks  ~/data/gcs-masks
+PYENV_VERSION=3.12.10 pyenv exec python -m venv .venv
+PYENV_VERSION=3.7.17 pyenv exec python -m venv .venv-features
 ```
 
-### Environment Variables
-
-`src/paths.py` reads these to resolve all project paths:
+Instalación del entorno principal:
 
 ```bash
-export SCD_DATA_DIR=/path/to/data            # default: repo/data/
-export SCD_MODELS_DIR=/path/to/models        # default: repo/models/
-export SCD_RESULTS_DIR=/path/to/results      # default: repo/results/
-export SCD_HAM10000_DIR=/path/to/HAM10000    # default: $SCD_DATA_DIR/HAM10000
-export SCD_ISIC_DIR=~/data/gcs               # default: ~/data/gcs
-export SCD_ISIC_IMAGES_DIR=~/data/gcs        # default: $SCD_ISIC_DIR
-export SCD_ISIC_MASKS_DIR=~/data/gcs-masks   # default: ~/data/gcs-masks
-export SCD_GCS_BUCKET=gs://your-bucket/scd-ml
+.venv/bin/python -m pip install -r requirements/main.txt
+
+# Elegir exactamente una variante de Torch:
+.venv/bin/python -m pip install -r requirements/torch-cpu.txt
+# .venv/bin/python -m pip install -r requirements/torch-cu126.txt  # GCP/L4
+
+.venv/bin/python -m pip install -r requirements/dev.txt
+.venv/bin/python -m pip install -e . --no-deps
 ```
 
-Add these to `~/.bashrc` or `~/.zshrc` on the GCP instance.
-
-### Sync Feature CSVs
+Instalación del extractor radiomics:
 
 ```bash
-export SCD_GCS_BUCKET=gs://your-bucket/scd-ml
-
-# After feature extraction — upload to GCS
-gsutil -m rsync -r -x '\.gitkeep$' results/features/ $SCD_GCS_BUCKET/features/
-
-# On local machine — download for analysis
-gsutil -m rsync -r $SCD_GCS_BUCKET/features/ results/features/
+.venv-features/bin/python -m pip install \
+  pip==24.0 setuptools==68.0.0 wheel==0.42.0
+.venv-features/bin/python -m pip install \
+  -r requirements/radiomics-py37.txt
 ```
 
----
+`pyproject.toml` no administra entornos ni dependencias. Solo declara el paquete
+`scd_ml` para que `pip install -e . --no-deps` permita importarlo desde scripts,
+tests y notebooks sin modificar `sys.path`. Las dependencias viven únicamente en
+`requirements/`.
 
-## EDA Notebooks
+Más detalles y smoke tests: [docs/environments.md](docs/environments.md).
 
-Launch with:
+## Estructura
+
+```text
+configs/                    parámetros explícitos de segmentación/radiomics
+notebooks/                  análisis exploratorio, no pipeline canónico
+requirements/               dependencias separadas por runtime/plataforma
+scripts/                    entrypoints de cada etapa
+src/scd_ml/data/            manifiestos y validaciones de splits
+src/scd_ml/segmentation/    dataset, modelo, entrenamiento, inferencia y métricas
+src/scd_ml/features/        contrato CSV radiomics
+tests/                      pruebas sintéticas; no leen data/
+```
+
+Los antiguos scripts `01_*`, `02_*` y `03_*` son wrappers temporales. Los nombres
+sin numeración son los entrypoints canónicos.
+
+## Ejecución del pipeline
+
+### 1. Crear los manifiestos
+
 ```bash
-jupyter notebook notebooks/eda/
+.venv/bin/python scripts/prepare_ham10000_split.py
+.venv/bin/python scripts/prepare_isic_split.py
 ```
 
-| Notebook | Dataset | Description |
-|----------|---------|-------------|
-| `notebooks/eda/01_isic_archive.ipynb` | ISIC Archive | Class distribution, demographics, image dimensions |
-| `notebooks/eda/02_ham10000.ipynb` | HAM10000 | Class balance, demographics, mask quality |
-| `notebooks/eda/03_udem.ipynb` | UDEM | Custom dataset exploration |
+HAM10000 queda dividido aproximadamente 70/10/20 por `lesion_id`. ISIC usa
+`patient_id`, con fallback a `lesion_id` e `image_id`, y asigna cinco folds dentro
+del 80 % de desarrollo. El script puede derivar el target ISIC a partir de
+`diagnosis_1` y `melanocytic`; no imputa variables clínicas.
 
----
+Los manifiestos se escriben en:
 
-## Scripts (Training & Inference)
+```text
+results/splits/ham10000_segmentation.csv
+results/splits/isic_classification.csv
+```
 
-Scripts are numbered by pipeline stage. Run them in a **tmux session** on GCP to survive SSH disconnections:
+Para reemplazar un manifiesto existente debe pasarse `--overwrite`.
+
+### 2. Entrenar y evaluar segmentación
 
 ```bash
-tmux new -s training
-source .venv-mask/bin/activate
-python scripts/01_train_mask_rcnn.py
+.venv/bin/python scripts/train_segmenter.py
 ```
 
-| Script | Environment | Description |
-|--------|-------------|-------------|
-| `scripts/01_train_mask_rcnn.py` | `.venv-mask` | Train Mask R-CNN on HAM10000 |
-| `scripts/02_apply_segmentation.py` | `.venv-mask` | Inference on ISIC images → save masks to GCS |
-| `scripts/03_extract_features.py` | `.venv-features` | Parallel radiomic extraction (resumable) |
+El entrenamiento:
 
----
+- optimiza solo con HAM10000 train;
+- monitorea Dice macro sobre validación;
+- guarda cada mejora en `models/segmentation/mask_rcnn_best.pt`;
+- restaura siempre el mejor checkpoint;
+- evalúa HAM10000 test una sola vez después de restaurarlo.
 
-## Results
+Las métricas por imagen y el resumen macro/micro se guardan bajo
+`results/segmentation/evaluation/`.
 
-Generated artifacts are saved to `results/`:
+### 3. Segmentar ISIC
 
-```
-results/
-├── eda/
-│   ├── ham10000/       # Class distribution, demographics plots
-│   └── isic/           # Class distribution, age, sex, anatomical site plots
-├── mask_rcnn/
-│   ├── training/       # Loss curves, LR schedule, training history CSV
-│   ├── evaluation/     # Dice, IoU, Precision, Recall per image (CSV + barplot)
-│   └── samples/        # Prediction overlay samples
-├── processed/          # Intermediate parquet/CSV artifacts
-└── features/           # Radiomic feature CSVs (gitignored — synced via GCS)
+```bash
+.venv/bin/python scripts/segment_isic.py
 ```
 
-Trained model checkpoints (`*.pth`) are gitignored — store and retrieve them via GCS.
+El resultado canónico es `results/segmentation/isic_masks_manifest.csv`. Cada fila
+conserva `image_id`, rutas, score, número de detecciones, estado y error. Una imagen
+sin detección genera una máscara vacía y estado `no_detection`; nunca desaparece de
+la cohorte.
+
+### 4. Extraer radiomics en Python 3.7
+
+```bash
+.venv-features/bin/python scripts/extract_radiomics.py \
+  --masks-manifest results/segmentation/isic_masks_manifest.csv
+```
+
+El extractor es autocontenido: no importa `scd_ml` y no genera Parquet. Produce:
+
+```text
+results/features/radiomics_features.csv
+results/features/radiomics_status.csv
+```
+
+`radiomics_status.csv` contiene una fila para cada imagen del manifiesto, incluidas
+máscaras vacías, errores de lectura y fallos upstream.
+
+### 5. Validar el handoff
+
+```bash
+.venv/bin/python scripts/validate_radiomics.py
+```
+
+La validación exige IDs únicos, cobertura completa, correspondencia exacta entre
+estado `ok` y filas de features, y variables radiomics numéricas.
+
+El esquema completo está documentado en [docs/pipeline.md](docs/pipeline.md).
+
+## Configuración y rutas
+
+Los parámetros de entrenamiento y thresholds están en `configs/segmentation.yaml`.
+Las clases de features PyRadiomics están en `configs/radiomics.yaml`.
+
+Las rutas pueden sobrescribirse con:
+
+```bash
+export SCD_DATA_DIR=/path/to/data
+export SCD_MODELS_DIR=/path/to/models
+export SCD_RESULTS_DIR=/path/to/results
+export SCD_HAM10000_DIR=/path/to/HAM10000
+export SCD_ISIC_DIR=/path/to/isic
+export SCD_ISIC_IMAGES_DIR=/path/to/isic/images
+export SCD_ISIC_MASKS_DIR=/path/to/isic/masks
+```
+
+## Pruebas
+
+Las pruebas son sintéticas y no acceden a `data/`:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v
+```
+
+Cubren aislamiento de grupos, ausencia de imputación por target, early stopping,
+casos de máscara vacía, precisión sin detección, contrato radiomics y compatibilidad
+estática del extractor con Python 3.7.

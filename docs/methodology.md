@@ -4,8 +4,9 @@ Experimental protocol for the final classification model trained on radiomic fea
 extracted from ISIC images (Mask R-CNN segmentation → pyradiomics → ML).
 
 **Dataset:** 76,715 images · 27,343 lesions · 5,791 patients · 4 classes
-**Features:** 408 radiomic features (4 channels × 7 feature classes), reduced by the
-correlation filter in `notebooks/preprocessing/01_feature_cleaning.ipynb`
+**Features:** radiomic features (4 channels × 7 feature classes). The active pipeline
+does not apply a global correlation filter; preprocessing will be implemented inside
+the classification folds.
 
 | Class | Images | Share |
 |-------|--------|-------|
@@ -74,9 +75,9 @@ pipe = Pipeline([
 
 Passing this object to `cross_val_score` guarantees each step is fit on train only.
 
-> **Known limitation:** the winsorization (p1–p99) in
-> `notebooks/preprocessing/01_feature_cleaning.ipynb` is fit on the full dataset. Either
-> move it inside the pipeline or declare it as a limitation.
+> The global preprocessing notebook is an archived prototype. Its historical outputs
+> are not valid classifier inputs. Winsorization and correlation filtering must be
+> estimators inside the fold-local pipeline.
 
 ---
 
@@ -179,7 +180,7 @@ Does the pattern make clinical sense?
 4. Ensemble vs best single model vs weighting baselines
 5. **Final metric on the frozen test set** — the honest number
 6. SHAP analysis + clinical discussion
-7. Limitations — global winsorization, SMOTE in high dimensions, no-interaction assumption
+7. Limitations — SMOTE in high dimensions and no-interaction assumption
 
 ---
 

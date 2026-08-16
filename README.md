@@ -137,6 +137,20 @@ El entrenamiento:
 Las métricas por imagen y el resumen macro/micro se guardan bajo
 `results/segmentation/evaluation/`.
 
+Para analizar las curvas, auditar el resumen de test y localizar los peores casos,
+abrir [notebooks/evaluation/01 segmentation results.ipynb](notebooks/evaluation/01%20segmentation%20results.ipynb)
+en la misma máquina donde se ejecutó el entrenamiento. La notebook solo lee:
+
+```text
+results/segmentation/training/training_history.csv
+results/segmentation/evaluation/ham10000_test_summary.csv
+results/segmentation/evaluation/ham10000_test_per_image.csv
+```
+
+Los CSV bajo `results/` son artefactos generados y están excluidos de Git. Por eso
+no llegan con `git pull`; deben analizarse en la VM que los produjo o sincronizarse
+mediante almacenamiento de objetos.
+
 ### 3. Segmentar ISIC
 
 ```bash

@@ -1,5 +1,6 @@
 .venv/
 .venv-features/
+.venv-mask/
 .env
 /data/
 __pycache__/
@@ -21,3 +22,6 @@ results/processed/features_clean.parquet
 
 # Generated CSV artifacts stay local or are synced through object storage.
 results/**/*.csv
+
+# Model checkpoints: almacenar en GCS, no en Git
+/models/**/*.pt

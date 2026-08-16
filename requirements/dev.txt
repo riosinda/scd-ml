@@ -1,4 +1,4 @@
-# Installed in .venv (Python 3.12.10), after main.txt.
+# Installed in .venv-mask (Python 3.12.10), after main.txt.
 jupyterlab==4.6.0
 notebook==7.6.0
 ipykernel==7.3.0

@@ -1,0 +1,3 @@
+# Optional Python 3.12 tool for downloading public ISIC Archive data.
+# Keep it outside main.txt: training and inference do not import it.
+isic-cli==12.5.2

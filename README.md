@@ -31,7 +31,7 @@ Se usan dos entornos creados con `pyenv`, `venv` y `pip`. No se usa `uv`.
 
 | Entorno | Python | Responsabilidad |
 |---|---:|---|
-| `.venv` | 3.12.10 | EDA, splits, segmentación, validación y futura clasificación |
+| `.venv-mask` | 3.12.10 | EDA, splits, segmentación, validación y futura clasificación |
 | `.venv-features` | 3.7.17 | Solo `scripts/extract_radiomics.py` |
 
 `.python-version` fija Python 3.12.10 como intérprete predeterminado. Para crear
@@ -42,21 +42,20 @@ pyenv install -s 3.12.10
 pyenv install -s 3.7.17
 pyenv local 3.12.10
 
-PYENV_VERSION=3.12.10 pyenv exec python -m venv .venv
+PYENV_VERSION=3.12.10 pyenv exec python -m venv .venv-mask
 PYENV_VERSION=3.7.17 pyenv exec python -m venv .venv-features
 ```
 
 Instalación del entorno principal:
 
 ```bash
-.venv/bin/python -m pip install -r requirements/main.txt
+.venv-mask/bin/python -m pip install -r requirements/main.txt
 
 # Elegir exactamente una variante de Torch:
-.venv/bin/python -m pip install -r requirements/torch-cpu.txt
-# .venv/bin/python -m pip install -r requirements/torch-cu126.txt  # GCP/L4
+.venv-mask/bin/python -m pip install -r requirements/torch-cpu.txt
+# .venv-mask/bin/python -m pip install -r requirements/torch-cu126.txt  # GCP/L4
 
-.venv/bin/python -m pip install -r requirements/dev.txt
-.venv/bin/python -m pip install -e . --no-deps
+.venv-mask/bin/python -m pip install -r requirements/dev.txt
 ```
 
 Instalación del extractor radiomics:
@@ -68,12 +67,19 @@ Instalación del extractor radiomics:
   -r requirements/radiomics-py37.txt
 ```
 
-`pyproject.toml` no administra entornos ni dependencias. Solo declara el paquete
-`scd_ml` para que `pip install -e . --no-deps` permita importarlo desde scripts,
-tests y notebooks sin modificar `sys.path`. Las dependencias viven únicamente en
-`requirements/`.
+No se instala el repositorio como paquete y no se usa `pyproject.toml`. El código
+principal vive bajo `src/`; los comandos canónicos establecen `PYTHONPATH=src`.
+Todas las dependencias viven exclusivamente en `requirements/`.
 
 Más detalles y smoke tests: [docs/environments.md](docs/environments.md).
+
+La preparación de datos tiene dos recorridos documentados:
+
+- **PC local:** descarga directa con el CLI oficial de ISIC y Torch CPU.
+- **VM GCP:** buckets, IAM, carga con `gcloud storage`, montaje con GCS Fuse,
+  redimensionamiento y remonte después de reiniciar.
+
+Comandos y estructura completa: [docs/data_setup.md](docs/data_setup.md).
 
 ## Estructura
 
@@ -88,16 +94,16 @@ src/scd_ml/features/        contrato CSV radiomics
 tests/                      pruebas sintéticas; no leen data/
 ```
 
-Los antiguos scripts `01_*`, `02_*` y `03_*` son wrappers temporales. Los nombres
-sin numeración son los entrypoints canónicos.
+Los entrypoints canónicos tienen nombres descriptivos y no dependen de una
+numeración: `train_segmenter.py`, `segment_isic.py` y `extract_radiomics.py`.
 
 ## Ejecución del pipeline
 
 ### 1. Crear los manifiestos
 
 ```bash
-.venv/bin/python scripts/prepare_ham10000_split.py
-.venv/bin/python scripts/prepare_isic_split.py
+PYTHONPATH=src .venv-mask/bin/python scripts/prepare_ham10000_split.py
+PYTHONPATH=src .venv-mask/bin/python scripts/prepare_isic_split.py
 ```
 
 HAM10000 queda dividido aproximadamente 70/10/20 por `lesion_id`. ISIC usa
@@ -117,7 +123,7 @@ Para reemplazar un manifiesto existente debe pasarse `--overwrite`.
 ### 2. Entrenar y evaluar segmentación
 
 ```bash
-.venv/bin/python scripts/train_segmenter.py
+PYTHONPATH=src .venv-mask/bin/python scripts/train_segmenter.py
 ```
 
 El entrenamiento:
@@ -134,7 +140,7 @@ Las métricas por imagen y el resumen macro/micro se guardan bajo
 ### 3. Segmentar ISIC
 
 ```bash
-.venv/bin/python scripts/segment_isic.py
+PYTHONPATH=src .venv-mask/bin/python scripts/segment_isic.py
 ```
 
 El resultado canónico es `results/segmentation/isic_masks_manifest.csv`. Cada fila
@@ -162,7 +168,7 @@ máscaras vacías, errores de lectura y fallos upstream.
 ### 5. Validar el handoff
 
 ```bash
-.venv/bin/python scripts/validate_radiomics.py
+PYTHONPATH=src .venv-mask/bin/python scripts/validate_radiomics.py
 ```
 
 La validación exige IDs únicos, cobertura completa, correspondencia exacta entre
@@ -187,12 +193,25 @@ export SCD_ISIC_IMAGES_DIR=/path/to/isic/images
 export SCD_ISIC_MASKS_DIR=/path/to/isic/masks
 ```
 
+Ejemplo para los puntos de montaje recomendados dentro del repositorio:
+
+```bash
+export SCD_HAM10000_DIR="$PWD/data/buckets/HAM10000"
+export SCD_ISIC_DIR="$PWD/data/buckets/ISIC_archive"
+export SCD_ISIC_IMAGES_DIR="$PWD/data/buckets/ISIC_archive"
+export SCD_ISIC_MASKS_DIR="$PWD/data/buckets/ISIC_masks"
+export PYTHONPATH="$PWD/src"
+```
+
+La descarga local con `isic-cli`, creación/carga de buckets y montaje en GCP se
+documentan en [docs/data_setup.md](docs/data_setup.md).
+
 ## Pruebas
 
 Las pruebas son sintéticas y no acceden a `data/`:
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v
+PYTHONPATH=src .venv-mask/bin/python -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
 Cubren aislamiento de grupos, ausencia de imputación por target, early stopping,

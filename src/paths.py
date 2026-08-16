@@ -1,6 +1,6 @@
-"""Deprecated compatibility import; use :mod:`scd_ml.paths`."""
+"""Notebook compatibility import for the source-layout package."""
 
-from scd_ml.paths import *  # noqa: F403
+from .scd_ml.paths import *  # noqa: F403
 
 # Historical names retained while old notebooks are migrated.
 EDA_ISIC_DIR = RESULTS_DIR / "eda" / "isic"  # noqa: F405

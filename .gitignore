@@ -1,4 +1,5 @@
 .venv/
+.venv-mask/
 .venv-features/
 .env
 /data/

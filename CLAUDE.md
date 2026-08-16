@@ -14,14 +14,14 @@ Classification is the next module and must not use HAM10000.
 ## Python runtimes
 
 ```text
-.venv/             Python 3.12.10  main package, segmentation, EDA and tests
+.venv-mask/        Python 3.12.10  segmentation, EDA, splits and tests
 .venv-features/    Python 3.7.17   standalone PyRadiomics extractor only
 ```
 
 Use pyenv + venv + pip. Do not add `uv`, `uv.lock`, or a third environment. Dependencies
-belong in `requirements/*.txt`; `pyproject.toml` contains package/tool metadata only.
-Never import `scd_ml` from `scripts/extract_radiomics.py` because the script is a Python
-3.7 process boundary.
+belong in `requirements/*.txt`; the repository is not installed as a package and has no
+`pyproject.toml`. Main-runtime commands use `PYTHONPATH=src`. Never import `scd_ml` from
+`scripts/extract_radiomics.py` because the script is a Python 3.7 process boundary.
 
 ## Canonical entrypoints
 
@@ -33,8 +33,8 @@ Never import `scd_ml` from `scripts/extract_radiomics.py` because the script is 
 6. `scripts/extract_radiomics.py`
 7. `scripts/validate_radiomics.py`
 
-The numbered scripts are compatibility wrappers only. New logic belongs under
-`src/scd_ml/`, except for the standalone Python 3.7 extractor.
+There are no numbered compatibility wrappers. New logic belongs under `src/scd_ml/`,
+except for the standalone Python 3.7 extractor.
 
 ## Invariants
 
@@ -46,4 +46,5 @@ The numbered scripts are compatibility wrappers only. New logic belongs under
 - Every ISIC image receives a segmentation and radiomics status; no silent row dropping.
 - Existing outputs require an explicit `--overwrite` before replacement.
 
-See `README.md`, `docs/environments.md`, and `docs/pipeline.md` for commands and schemas.
+See `README.md`, `docs/environments.md`, `docs/data_setup.md`, and `docs/pipeline.md`
+for commands, data acquisition, GCP mounts and schemas.

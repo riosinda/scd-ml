@@ -58,14 +58,44 @@ Instalación del entorno principal:
 .venv-mask/bin/python -m pip install -r requirements/dev.txt
 ```
 
-Instalación del extractor radiomics:
+Instalación del extractor radiomics. El orden es importante en Python 3.7:
 
 ```bash
 .venv-features/bin/python -m pip install \
   pip==24.0 setuptools==68.0.0 wheel==0.42.0
+
 .venv-features/bin/python -m pip install \
-  -r requirements/radiomics-py37.txt
+  numpy==1.21.6 \
+  pandas==1.3.5 \
+  opencv-python-headless==4.13.0.92
+
+.venv-features/bin/python -m pip install \
+  PyWavelets==1.3.0 \
+  pykwalify==1.8.0 \
+  ruamel.yaml==0.17.21 \
+  docopt==0.6.2 \
+  six==1.17.0 \
+  python-dateutil==2.9.0.post0 \
+  pytz==2024.2 \
+  tqdm==4.68.0
+
+.venv-features/bin/python -m pip install \
+  SimpleITK==2.2.1 \
+  --only-binary=:all:
+
+.venv-features/bin/python -m pip install \
+  pyradiomics==3.1.0 \
+  --only-binary=:all: \
+  --no-deps
+
+.venv-features/bin/python -m pip check
+.venv-features/bin/python -c \
+  "import cv2, numpy, pandas, SimpleITK, radiomics; print(radiomics.__version__)"
 ```
+
+Primero se fijan las dependencias compatibles, después se instala SimpleITK desde
+su wheel binario y PyRadiomics se instala al final sin volver a resolver ni cambiar
+las dependencias. El extractor actual no usa `pydicom`.
 
 No se instala el repositorio como paquete y no se usa `pyproject.toml`. El código
 principal vive bajo `src/`; los comandos canónicos establecen `PYTHONPATH=src`.

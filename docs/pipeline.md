@@ -59,3 +59,9 @@ Estados radiomics: `ok`, `empty_mask`, `error` o `upstream_<status>`. El validad
 Python 3.12 exige que los IDs `ok` sean exactamente los IDs presentes en features y
 que todos los IDs del manifiesto tengan un estado. Esto hace visible la pérdida de
 cohorte antes de construir cualquier clasificador.
+
+El extractor usa el CSV de características como checkpoint durable y se reanuda
+por `image_id`. También conserva las máscaras vacías ya verificadas y vuelve a
+intentar estados incompletos o con error. Mientras está ejecutándose mantiene un
+journal `radiomics_status.csv.resume`, que compacta de forma atómica al finalizar.
+Solo `--overwrite` elimina el avance existente.

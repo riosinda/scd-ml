@@ -169,6 +169,11 @@ la cohorte.
   --masks-manifest results/segmentation/isic_masks_manifest.csv
 ```
 
+La extracción se reanuda automáticamente si ya existen
+`radiomics_features.csv` o `radiomics_status.csv`: conserva las características
+terminadas y procesa únicamente IDs pendientes, inconsistentes o con error. Para
+descartar el avance y comenzar nuevamente debe pasarse `--overwrite`.
+
 El extractor es autocontenido: no importa `scd_ml` y no genera Parquet. Produce:
 
 ```text

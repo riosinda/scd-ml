@@ -65,3 +65,41 @@ por `image_id`. También conserva las máscaras vacías ya verificadas y vuelve 
 intentar estados incompletos o con error. Mientras está ejecutándose mantiene un
 journal `radiomics_status.csv.resume`, que compacta de forma atómica al finalizar.
 Solo `--overwrite` elimina el avance existente.
+
+## Datasets fold-local de clasificación
+
+`notebooks/preprocessing/02 fold-local classification datasets.ipynb` consume el
+manifiesto ISIC bloqueado, la metadata cruda y el handoff validado de PyRadiomics.
+Rechaza una extracción parcial: todo `image_id` del manifiesto debe tener un estado
+radiomics explícito y cada estado `ok` debe tener exactamente una fila de features.
+
+Para cada fold 0–4 ajusta imputación por mediana, winsorización p1–p99 y filtro de
+correlación `|r| > 0.95` exclusivamente sobre el train del fold. Luego aplica esos
+parámetros a su validación. La metadata clínica (`age_approx`,
+`anatom_site_1`, `pixels_x`, `pixels_y` y `sex`) se conserva cruda en cada
+Parquet; su imputación, codificación y escalado pertenecen al pipeline del modelo
+y también se ajustan exclusivamente con train. La notebook escribe:
+
+```text
+results/classification/fold_datasets/
+├── fold_0/ ... fold_4/
+│   ├── train.parquet
+│   ├── validation.parquet
+│   ├── preprocessing_parameters.csv
+│   └── dropped_features.csv
+├── test_raw.parquet
+├── cohort_exclusions.csv
+├── cohort_coverage_by_class.csv
+├── fold_summary.csv
+├── preprocessing_parameters_all_folds.csv
+├── dropped_features_all_folds.csv
+├── feature_selection_frequency.csv
+└── feature_selection_jaccard.csv
+```
+
+El test permanece crudo y congelado. Solo se transforma después de elegir la
+configuración, al reajustar el pipeline completo sobre todo development. Las
+extracciones no exitosas se excluyen de las matrices de modelado, pero permanecen
+documentadas en `cohort_exclusions.csv`; nunca se pierden mediante un `inner join`.
+Las tasas de cobertura por split y clase se conservan en
+`cohort_coverage_by_class.csv` para hacer visible una posible exclusión diferencial.

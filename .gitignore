@@ -17,12 +17,15 @@ train.log
 results/features/*
 !results/features/.gitkeep
 
-# Cleaned feature matrix (127 MB) — regenerate with
-# notebooks/preprocessing/01_feature_cleaning.ipynb, or sync via GCS.
+# Historical globally cleaned matrix. It is not valid classifier input; retained
+# locally only for provenance while the archived prototype is phased out.
 results/processed/features_clean.parquet
 
 # Generated CSV artifacts stay local or are synced through object storage.
 results/**/*.csv
+
+# Fold-local classification datasets and preprocessing reports.
+results/classification/
 
 # Model checkpoints: almacenar en GCS, no en Git
 /models/**/*.pt

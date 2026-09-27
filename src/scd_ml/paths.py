@@ -29,6 +29,8 @@ SEGMENTATION_DIR = RESULTS_DIR / "segmentation"
 SEGMENTATION_TRAINING_DIR = SEGMENTATION_DIR / "training"
 SEGMENTATION_EVALUATION_DIR = SEGMENTATION_DIR / "evaluation"
 FEATURES_DIR = RESULTS_DIR / "features"
+CLASSIFICATION_DIR = RESULTS_DIR / "classification"
+MLFLOW_DIR = RESULTS_DIR / "mlflow"
 
 
 def ensure_dir(path: Path) -> Path:

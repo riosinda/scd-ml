@@ -90,7 +90,7 @@ Passing this object to `cross_val_score` guarantees each step is fit on train on
 | **Channels** | all · RGB · gray | **Ablation** — how much does each channel group contribute? |
 | **Selection** | none · filter (ANOVA F) · embedded (L1 / tree importance) · RFE | Family comparison |
 | **Balancing** | none · `class_weight` · SMOTE | Strategy comparison |
-| **Models** | LogReg · LightGBM · RandomForest · MLP | One per inductive-bias family |
+| **Models** | LogReg · XGBoost · RandomForest · MLP · RBF SVM | One per inductive-bias family |
 
 The channel factor is an **ablation, not a competition**: "all" is a superset of the other
 two. The question it answers is *does colour add anything over greyscale?* If gray-only
@@ -105,7 +105,7 @@ folds is a selection-bias machine.
 
 | Stage | What varies | Configurations |
 |-------|-------------|----------------|
-| **1 — Screening** | All factors, but only 2 cheap models (LogReg, LightGBM), default hyperparameters | 3 × 4 × 3 × 2 = **72** |
+| **1 — Screening** | All factors, but only 2 cheap models (LogReg, XGBoost), default hyperparameters | 3 × 4 × 3 × 2 = **72** |
 | **2 — Deep dive** | Best (selection, balancing) fixed; 3 channels × 5 models, full hyperparameter search | 3 × 5 = **15** |
 | **3 — Ensemble** | Top 3–5 models; weighting schemes: equal · score-proportional · genetic algorithm · logistic stacking | **4** |
 | **4 — Frozen test** | Winner only | **1** |
@@ -118,8 +118,9 @@ Stage 2 yields the channel-ablation table and the model comparison in a single p
 (i.e. the best balancing strategy is the same regardless of channel). Standard and
 reasonable, but it belongs in the limitations section.
 
-**On SVM:** RBF-SVM is O(n²) on ~61k training rows — hours per fit. Excluded in favour of
-the MLP as the dense non-linear model. Use `LinearSVC` or subsampling if it must be included.
+**On SVM:** an exact RBF `SVC` is O(n²) on ~61k training rows — hours per fit. It is included
+through a Nyström approximation of the RBF kernel (linear in rows) followed by a calibrated
+`LinearSVC`, which trains on every fold row instead of a subsample.
 
 ---
 

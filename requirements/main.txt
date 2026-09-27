@@ -12,3 +12,8 @@ Pillow==11.3.0
 tqdm==4.67.1
 PyYAML==6.0.3
 pycocotools==2.0.10
+joblib==1.6.0
+xgboost==3.4.1
+imbalanced-learn==0.14.2
+optuna==5.0.0
+mlflow==3.16.1

@@ -2,11 +2,12 @@
 
 ## Project contract
 
-This repository currently implements lesion segmentation and radiomics extraction.
-Classification is the next module and must not use HAM10000.
+This repository implements lesion segmentation, radiomics extraction and the staged
+four-class classifier (screening, Optuna tuning, frozen test). Classification must not
+use HAM10000. Ensembling and SHAP are not implemented yet.
 
 - HAM10000: Mask R-CNN segmentation only; split 70/10/20 by `lesion_id`.
-- ISIC: future four-class classification; grouped 80/20 holdout plus five development folds.
+- ISIC: four-class classification; grouped 80/20 holdout plus five development folds.
 - UDEM: future external validation only.
 - Never read or commit raw data while performing repository maintenance.
 - Notebooks are exploratory and must not define production preprocessing.
@@ -32,6 +33,9 @@ belong in `requirements/*.txt`; the repository is not installed as a package and
 5. `scripts/segment_isic.py`
 6. `scripts/extract_radiomics.py`
 7. `scripts/validate_radiomics.py`
+8. `scripts/screen_classifiers.py`
+9. `scripts/tune_classifiers.py`
+10. `scripts/evaluate_classifier.py`
 
 There are no numbered compatibility wrappers. New logic belongs under `src/scd_ml/`,
 except for the standalone Python 3.7 extractor.
@@ -40,7 +44,12 @@ except for the standalone Python 3.7 extractor.
 
 - Preserve patient/lesion/image identifiers in manifests; never use them as classifier features.
 - Never impute clinical fields from `target`.
-- Fit future imputation, winsorization, feature selection and scaling inside each training fold.
+- Fit imputation, winsorization, feature selection, scaling and resampling inside each
+  training fold; the classifier head/tail split in `classification/pipeline.py` enforces it.
+- `pixels_x`/`pixels_y` are acquisition fields and never classifier features.
+- The frozen test is scored only from a complete `winner.json`, never with hand-picked settings.
+- MLflow (`results/mlflow/`) mirrors classification results; files under
+  `results/classification/` stay authoritative and MLflow never feeds a decision.
 - Early stopping maximizes validation Dice and always restores the best checkpoint before test.
 - A missing segmentation prediction has pixel precision 0, not 1.
 - Every ISIC image receives a segmentation and radiomics status; no silent row dropping.

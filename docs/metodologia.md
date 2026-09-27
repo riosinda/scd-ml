@@ -96,7 +96,7 @@ train.
 | **Canales** | todos · RGB · gray | **Ablación** — ¿cuánto aporta cada grupo de canales? |
 | **Selección** | ninguna · filtro (ANOVA F) · embebido (L1 / importancia de árboles) · RFE | Comparación de familias |
 | **Balanceo** | ninguno · `class_weight` · SMOTE | Comparación de estrategias |
-| **Modelos** | LogReg · LightGBM · RandomForest · MLP | Uno por familia de sesgo inductivo |
+| **Modelos** | LogReg · XGBoost · RandomForest · MLP · SVM RBF | Uno por familia de sesgo inductivo |
 
 El factor de canales es una **ablación, no una competencia**: "todos" es superconjunto de los
 otros dos. La pregunta que responde es *¿el color aporta algo sobre la escala de grises?* Si
@@ -111,7 +111,7 @@ estimaciones ruidosas sobre los mismos folds es una máquina de sesgo de selecci
 
 | Etapa | Qué varía | Configuraciones |
 |-------|-----------|-----------------|
-| **1 — Screening** | Todos los factores, pero solo 2 modelos baratos (LogReg, LightGBM), hiperparámetros por defecto | 3 × 4 × 3 × 2 = **72** |
+| **1 — Screening** | Todos los factores, pero solo 2 modelos baratos (LogReg, XGBoost), hiperparámetros por defecto | 3 × 4 × 3 × 2 = **72** |
 | **2 — Profundización** | Mejor (selección, balanceo) fija; 3 canales × 5 modelos, búsqueda completa de hiperparámetros | 3 × 5 = **15** |
 | **3 — Ensamble** | Top 3–5 modelos; esquemas de ponderación: iguales · proporcional al score · algoritmo genético · stacking logístico | **4** |
 | **4 — Test congelado** | Solo el ganador | **1** |
@@ -125,9 +125,29 @@ pasada.
 fuertemente (es decir, que la mejor estrategia de balanceo es la misma sin importar el canal).
 Es estándar y razonable, pero va en la sección de limitaciones.
 
-**Sobre el SVM:** un SVM-RBF es O(n²) sobre ~61k filas de entrenamiento — horas por ajuste.
-Se excluye en favor del MLP como modelo denso no lineal. Si debe incluirse, usar `LinearSVC` o
-submuestrear.
+**Sobre el SVM:** un `SVC` RBF exacto es O(n²) sobre ~61k filas de entrenamiento — horas por
+ajuste. Se incluye mediante una aproximación de Nyström del kernel RBF (lineal en filas), que
+entrena con todas las filas del fold, en lugar de submuestrear.
+
+### Implementación
+
+- **Modelos:** LogReg (lineal), XGBoost (boosting), RandomForest (bagging), MLP (red densa) y
+  SVM RBF (kernel). El SVM usa `Nystroem` con `gamma = gamma_scale / k` seguido de `LinearSVC`
+  calibrado (`CalibratedClassifierCV`, sigmoide); se tunean `C`, `gamma_scale` y el número de
+  componentes. `LinearSVC` sin kernel se descartó por duplicar la familia lineal de LogReg.
+  XGBoost reemplaza a LightGBM como modelo de boosting, siguiendo la literatura radiómica.
+- **Resultados:** cada etapa exporta figuras (incluida la estabilidad y las familias de las
+  features seleccionadas) y replica sus métricas en MLflow; los archivos en disco siguen siendo
+  la fuente de verdad.
+- **Selección:** el nivel "embebido" usa `SelectFromModel` sobre una LogReg L1; filtro,
+  embebido y RFE retienen `k=50` en el screening y `k` se ajusta en la etapa 2.
+- **Etapa 1:** el par (selección, balanceo) ganador es el de menor rank medio entre las seis
+  celdas canal × modelo, no el máximo de una celda.
+- **Ablación de metadata (etapa 2b):** con el mejor canal de 2a se repiten los cinco modelos
+  añadiendo edad, sexo y sitio anatómico (15 + 5 = 20 estudios Optuna). `pixels_x/y` se
+  excluyen por ser un atajo de adquisición.
+- **Etapa 4:** implementada para el mejor modelo individual; el ensamble (etapa 3) queda
+  pendiente y usará las probabilidades OOF guardadas por el tuning.
 
 ---
 

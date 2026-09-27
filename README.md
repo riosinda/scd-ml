@@ -1,7 +1,7 @@
 # Skin Cancer Detection — ML Thesis
 
 Pipeline de investigación para segmentación de lesiones, extracción de variables
-radiomics y futura clasificación de cáncer de piel.
+radiomics y clasificación de cáncer de piel en cuatro clases.
 
 ## Alcance actual
 
@@ -17,11 +17,16 @@ ISIC metadata ─────► split 80/20 por paciente           │
                                                         │
                                                         ▼ Python 3.12.10
                                                 validación de contrato
+                                                        │
+                                                        ▼
+                              screening ─► tuning Optuna ─► test congelado
 ```
 
 - HAM10000 se usa exclusivamente para segmentación.
-- ISIC aporta el conjunto de futura clasificación y mantiene un test bloqueado del 20 %.
-- El clasificador aún no forma parte del repositorio.
+- ISIC aporta el conjunto de clasificación y mantiene un test bloqueado del 20 %.
+- La clasificación sigue el protocolo por etapas de [docs/metodologia.md](docs/metodologia.md):
+  screening, tuning con CV agrupada y una única evaluación en test (el ensamble y SHAP
+  quedan pendientes).
 - UDEM queda reservado para validación externa futura.
 - Los notebooks son EDA; no definen el pipeline de producción.
 
@@ -121,11 +126,13 @@ scripts/                    entrypoints de cada etapa
 src/scd_ml/data/            manifiestos y validaciones de splits
 src/scd_ml/segmentation/    dataset, modelo, entrenamiento, inferencia y métricas
 src/scd_ml/features/        contrato CSV radiomics
+src/scd_ml/classification/  cohort, pipelines fold-local, CV, tuning y estadística
 tests/                      pruebas sintéticas; no leen data/
 ```
 
 Los entrypoints canónicos tienen nombres descriptivos y no dependen de una
-numeración: `train_segmenter.py`, `segment_isic.py` y `extract_radiomics.py`.
+numeración: `train_segmenter.py`, `segment_isic.py`, `extract_radiomics.py`,
+`screen_classifiers.py`, `tune_classifiers.py` y `evaluate_classifier.py`.
 
 ## Ejecución del pipeline
 
@@ -225,10 +232,45 @@ estado `ok` y filas de features, y variables radiomics numéricas.
 
 El esquema completo está documentado en [docs/pipeline.md](docs/pipeline.md).
 
+### 6. Clasificación
+
+```bash
+# Etapa 1: canales × selección × balanceo con LogReg/XGBoost (72 configs × 5 folds)
+PYTHONPATH=src .venv-mask/bin/python scripts/screen_classifiers.py
+
+# Etapa 2: Optuna por canal × modelo (2a) y ablación con metadata (2b), más el reporte
+PYTHONPATH=src .venv-mask/bin/python scripts/tune_classifiers.py
+
+# Etapa 4: refit del ganador sobre todo development y evaluación única del test
+PYTHONPATH=src .venv-mask/bin/python scripts/evaluate_classifier.py
+```
+
+El screening y el tuning se reanudan si se interrumpen; `--overwrite` descarta el
+avance. Para repartir el tuning entre procesos se puede ejecutar
+`--stage 2a --study <canal>_<modelo>` en paralelo y cerrar con `--stage 2b` y
+`--stage report`. `evaluate_classifier.py` solo acepta un `winner.json` completo
+(5 folds, 20 estudios) y se niega a reemplazar un test ya evaluado sin `--overwrite`.
+
+La etapa 2 ajusta LogReg, XGBoost, RandomForest, MLP y SVM RBF (Nyström). Cada
+etapa guarda figuras en `<output-dir>/figures/` (ranking de estrategias, estabilidad
+y familias de features seleccionadas, ablaciones, historial de Optuna, matriz de
+confusión y curvas ROC/PR) y replica sus resultados en MLflow:
+
+```bash
+.venv-mask/bin/mlflow ui --backend-store-uri sqlite:///results/mlflow/mlflow.db
+```
+
+`--no-mlflow` desactiva el registro y `--mlflow-uri` (o `MLFLOW_TRACKING_URI`) apunta
+a otro servidor. Los archivos en `results/classification/` siguen siendo la fuente
+de verdad.
+
 ## Configuración y rutas
 
 Los parámetros de entrenamiento y thresholds están en `configs/segmentation.yaml`.
 Las clases de features PyRadiomics están en `configs/radiomics.yaml`.
+El diseño experimental de clasificación (factores, `k`, presupuesto de trials) está
+en `configs/classification.yaml`; los rangos de búsqueda de Optuna están en
+`src/scd_ml/classification/tuning.py`.
 
 Las rutas pueden sobrescribirse con:
 
@@ -264,5 +306,6 @@ PYTHONPATH=src .venv-mask/bin/python -m unittest discover -s tests -p 'test_*.py
 ```
 
 Cubren aislamiento de grupos, ausencia de imputación por target, early stopping,
-casos de máscara vacía, precisión sin detección, contrato radiomics y compatibilidad
-estática del extractor con Python 3.7.
+casos de máscara vacía, precisión sin detección, contrato radiomics, compatibilidad
+estática del extractor con Python 3.7, preprocesamiento fold-local, ausencia de IDs
+como features, cobertura OOF, t-test corregido y bloqueo del test congelado.

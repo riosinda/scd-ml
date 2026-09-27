@@ -27,5 +27,11 @@ results/**/*.csv
 # Fold-local classification datasets and preprocessing reports.
 results/classification/
 
+# MLflow tracking store (SQLite + artifacts); results/classification stays authoritative.
+results/mlflow/
+mlruns/
+mlflow.db
+
 # Model checkpoints: almacenar en GCS, no en Git
 /models/**/*.pt
+/models/**/*.joblib

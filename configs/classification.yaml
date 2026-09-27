@@ -1,0 +1,24 @@
+seed: 42
+preprocessing:
+  winsor_low: 0.01
+  winsor_high: 0.99
+  correlation_threshold: 0.95
+screening:
+  channel_sets: [all, rgb, gray]
+  selections: [none, anova, l1, rfe]
+  balancings: [none, class_weight, smote]
+  models: [logreg, xgboost]
+  k: 50
+tuning:
+  channel_sets: [all, rgb, gray]
+  models: [logreg, xgboost, random_forest, mlp, rbf_svm]
+  k_max: 150
+  n_trials:
+    logreg: 30
+    xgboost: 60
+    random_forest: 30
+    mlp: 30
+    rbf_svm: 30
+  pruner:
+    n_startup_trials: 5
+    n_warmup_steps: 1

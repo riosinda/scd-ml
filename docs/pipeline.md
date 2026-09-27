@@ -103,3 +103,98 @@ extracciones no exitosas se excluyen de las matrices de modelado, pero permanece
 documentadas en `cohort_exclusions.csv`; nunca se pierden mediante un `inner join`.
 Las tasas de cobertura por split y clase se conservan en
 `cohort_coverage_by_class.csv` para hacer visible una posible exclusión diferencial.
+
+## Clasificación por etapas
+
+Los tres entrypoints reconstruyen el cohort desde el manifiesto, el handoff
+PyRadiomics validado y la metadata cruda (`scd_ml.classification.data.load_cohort`).
+No consumen los Parquet de `fold_datasets/`, que quedan como auditoría, porque la
+ablación de canales exige reajustar el filtro de correlación sobre cada subconjunto.
+
+Cada pipeline tiene dos partes, ambas ajustadas solo con el train de cada fold:
+
+```text
+head: ColumnTransformer[FoldLocalRadiomicsTransformer(canales), MetadataEncoder?] → StandardScaler
+tail: selector (none | anova | l1 | rfe) → balancer (none | SMOTE) → modelo
+```
+
+La CV ajusta el head una sola vez por (canales, metadata, fold) y reconstruye el tail
+en cada configuración. El refit final ejecuta las mismas dos partes sobre todo
+development y serializa el pipeline completo. `class_weight="balanced"` se aplica en
+el modelo; el MLP y XGBoost, que no lo admiten, reciben `sample_weight` equivalente.
+El SVM RBF usa una aproximación de Nyström del kernel (`gamma = gamma_scale / k`)
+seguida de `LinearSVC` y calibración sigmoide, porque un `SVC` exacto es O(n²). La metadata
+clínica se limita a `age_approx` (mediana + indicador de faltante), `sex` y
+`anatom_site_1` (one-hot con categoría `missing`). `pixels_x`/`pixels_y` e IDs nunca
+son features.
+
+### Etapa 1 — `results/classification/screening/`
+
+| Archivo | Contenido |
+|---|---|
+| `run_config.json` | Protocolo; reanudar con otro protocolo exige `--overwrite` |
+| `fold_scores.csv` | Una fila por configuración × fold con todas las métricas |
+| `selected_features.csv` | Features retenidas por cada selector, por fold |
+| `summary.csv` | Media y desviación estándar por configuración |
+| `strategy_ranking.csv` | Rank medio de cada par (selección, balanceo) entre celdas canal × modelo |
+| `selected_strategy.json` | Par ganador, `k` y `complete` |
+| `feature_stability.csv` / `feature_stability_jaccard.csv` | Frecuencia de selección y Jaccard entre folds |
+| `figures/strategy_ranking.png` | Rank medio de cada par (selección, balanceo) |
+| `figures/screening_f1_heatmap.png` | F1-macro medio por estrategia × (canal, modelo) |
+| `figures/feature_selection_stability.png` | Jaccard entre folds por selector y canal |
+| `figures/selected_features_<canal>.png` | Top features por frecuencia y familias radiómicas, por selector |
+
+### Etapa 2 — `results/classification/tuning/`
+
+Estudios `<canal>_<modelo>` (2a, solo radiomics) y `<mejor_canal>_<modelo>_meta` (2b).
+El mejor canal es el de mayor F1-macro medio entre modelos en 2a.
+
+| Archivo | Contenido |
+|---|---|
+| `optuna.db` | Estudios TPE reanudables; cada trial reporta F1 por fold para el pruning |
+| `best_params/<estudio>.json` | Configuración completa del mejor trial |
+| `oof/<estudio>.parquet` | Probabilidades out-of-fold del mejor trial (insumo del ensamble) |
+| `cv/<estudio>.csv`, `fold_scores.csv` | Métricas por fold del mejor trial |
+| `selected_features/<estudio>.csv` | Features retenidas por el selector del mejor trial, por fold |
+| `studies_summary.csv` | Media ± sd por estudio, ordenado por F1-macro |
+| `channel_ablation.csv` | F1 por modelo y canal, con t-test corregido contra gray |
+| `metadata_ablation.csv` | Radiomics vs radiomics + metadata por modelo |
+| `pairwise_tests.csv` | Nadeau–Bengio del ganador contra cada estudio |
+| `tuning_report.json` | Friedman entre modelos, estudios esperados/presentes |
+| `winner.json` | Configuración ganadora, métricas CV y `complete` |
+| `figures/studies_f1.png` | F1-macro ± sd por estudio (con `k` elegido) |
+| `figures/per_class_recall.png` | Recall medio por clase y estudio |
+| `figures/channel_ablation.png` | F1 por modelo y canal, con `*` si p < 0.05 contra gray |
+| `figures/metadata_ablation.png` | Radiomics vs radiomics + metadata, con p-valor |
+| `figures/optimization_history.png` | Mejor F1 acumulado por trial de Optuna |
+| `figures/winner_selected_features.png` | Features del ganador por frecuencia entre folds y familia |
+
+### Etapa 4 — `results/classification/test/`
+
+`metrics.json`, `per_class.csv`, `confusion_matrix.csv`, `predictions.parquet`
+(IDs + probabilidades), `coverage.csv` (imágenes de test excluidas por radiomics,
+por clase) y `selected_features.csv` (features del modelo final). En `figures/`
+quedan la matriz de confusión (conteos y normalizada), las curvas ROC y
+precision–recall one-vs-rest, recall/F1 por clase y las familias de las features
+seleccionadas. El modelo queda en `models/classification/winner.joblib` junto con su
+configuración, columnas de entrada y orden de clases. Se ejecuta solo con un
+`winner.json` completo y se niega a reemplazar resultados sin `--overwrite`.
+
+### MLflow — `results/mlflow/`
+
+Los tres entrypoints replican sus resultados en MLflow (desactivable con
+`--no-mlflow`). Los archivos de `results/classification/` siguen siendo la fuente de
+verdad: `winner.json` es lo único que decide qué se evalúa en el test.
+
+| Experimento | Run padre | Runs hijos |
+|---|---|---|
+| `classification-screening` | Protocolo, estrategia elegida, CSV y figuras | Una por configuración: parámetros, media/sd de métricas y F1 por fold (`step` = fold) |
+| `classification-tuning` | Configuración de la etapa 2, métricas del ganador, CSV y figuras | Una por estudio con el mejor trial; se reemplaza si Optuna encuentra otro mejor |
+| `classification-test` | Una run por evaluación: métricas de test y CV, predicciones, figuras y modelo | — |
+
+El id del run padre se guarda en `<output-dir>/mlflow_run.json`: una etapa reanudada
+reabre ese run y solo agrega hijos faltantes; `--overwrite` crea un run nuevo. El
+store por defecto es `sqlite:///results/mlflow/mlflow.db` con artefactos en
+`results/mlflow/artifacts/`; `--mlflow-uri` o `MLFLOW_TRACKING_URI` lo reemplazan.
+En el tuning, MLflow se escribe solo en `--stage all` o `report`, así que los
+procesos paralelos de `--stage 2a --study` no compiten por el run padre.
